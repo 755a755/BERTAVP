@@ -11,13 +11,13 @@ def read_fasta(fname):
     Output: dataframe of Peptide Seq {ID1: Seq1, ID2: Seq2,...}
     '''
     with open(fname, "rU") as f:
-        seq_dict = [(record.id, record.seq._data) for record in SeqIO.parse(f, "fasta")]      #使用Bio.SeqIO.parse()函数读取fasta文件得到序列名字和内容，record会得到record.id和record.seq
+        seq_dict = [(record.id, record.seq._data) for record in SeqIO.parse(f, "fasta")]      
     seq_df = pd.DataFrame(data=seq_dict, columns=["Id", "Sequence"])
     return seq_df
 
 
-def insert_phycs(seq_df):  # 调用了modlamp包里面的PeptideDescriptor去计算hydrophobic moment，Hydrophobicity，Transmembrane Propensity，Alpha Helical Propensity
-    seq_df = seq_df.copy()  # 调用了GlobalDescriptor去计算Aromacity，Aliphatic Index，Boman Index
+def insert_phycs(seq_df):  
+    seq_df = seq_df.copy() 
 
     #  Function for compute Isoelectric Point or net_charge of peptide
     def get_ieq_nc(seq, is_iep=True):
@@ -132,10 +132,10 @@ def AAC(fastas, **kw):
 	encodings.append(header)
 
 	for i in fastas:
-		name, sequence = i[0], re.sub('-', '', i[1])	#将sequence里的‘-’换成了‘’。
-		count = Counter(sequence)								#算序列字母的个数，比如L有2个，K有2个
+		name, sequence = i[0], re.sub('-', '', i[1])	
+		count = Counter(sequence)								
 		for key in count:
-			count[key] = count[key]/len(sequence)					#conunt[key]原本是存着序列字母的个数，但是经过这一句之后就变成了count[key]上的key氨基酸所占的比例（概率）
+			count[key] = count[key]/len(sequence)					
 		code = [name]
 		for aa in AA:
 			code.append(count[aa])
@@ -157,28 +157,28 @@ def CKSAAP(fastas, gap=5, **kw):
 	for aa1 in AA:
 		for aa2 in AA:
 			aaPairs.append(aa1 + aa2)
-	header = ['#']                              #aaPairs存着A氨基酸从A氨基酸一直配对到Y氨基酸，然后开始C氨基酸的配对一直配到Y氨基酸，即所有可能性的残基对，400个
-	for g in range(gap+1):						#g是0到5，这两个for嵌套只是将aaPairs里残基对加上.gap+str（g）写到header里，最后写到encodings
+	header = ['#']                              
+	for g in range(gap+1):						
 		for aa in aaPairs:
 			header.append(aa + '.gap' + str(g))
-	encodings.append(header)                   #写了6组所有可能性的残基对进去。
+	encodings.append(header)                   
 	for i in fastas:
 		name, sequence = i[0], i[1]
 		code = [name]
 		for g in range(gap+1):
 			myDict = {}
 			for pair in aaPairs:
-				myDict[pair] = 0                     #将myDict字典里的pair初始化，就是将400个残基对都初始化为0
+				myDict[pair] = 0                    
 			sum = 0
 			for index1 in range(len(sequence)):
 				index2 = index1 + g + 1
-				if index1 < len(sequence) and index2 < len(sequence) and sequence[index1] in AA and sequence[index2] in AA: #应该是只有index2有机会不符合这个if条件
+				if index1 < len(sequence) and index2 < len(sequence) and sequence[index1] in AA and sequence[index2] in AA: 
 					myDict[sequence[index1] + sequence[index2]] = myDict[sequence[index1] + sequence[index2]] + 1
-					sum = sum + 1																							#当g=0时（间隔为0），找序列里间隔为0的残基对，找到一个就在myDict里+1，
-			for pair in aaPairs:																							#算完g=0时（算完间隔为0的残基对数量时），通过遍历全部残基对并除总数放到code里
-				code.append(myDict[pair] / sum)																				#算完g=0时，就算g=1（间隔为1的残基对数量）
-		encodings.append(code)																								#一直算到g=5时，
-	return encodings																										#g=0，myDict里有400个总的残基对，g=1时，也有400个残基对，但是第一个会有name写着
+					sum = sum + 1																							
+			for pair in aaPairs:																							
+				code.append(myDict[pair] / sum)																				
+		encodings.append(code)																								
+	return encodings						
 
 
 def Rvalue(aa1, aa2, AADict, Matrix):
@@ -193,27 +193,27 @@ def PAAC(fastas, lambdaValue=6, w=0.5, **kw):
 	with open(dataFile) as f:
 		records = f.readlines()
 	AA = ''.join(records[0].rstrip().split()[1:])
-	AADict = {}                                    #从文件PAAC.txt里读取数据，将“ARNDCQEGHILKMFPSTWYV”读出来并赋值给AA
+	AADict = {}                                   
 	for i in range(len(AA)):
-		AADict[AA[i]] = i							#应该是创建以AA氨基酸名字的字典并赋上0~19,'ARNDCQEGHILKMFPSTWYV'{’A‘:0，'R':1,'N':2....}
+		AADict[AA[i]] = i							
 	AAProperty = []
 	AAPropertyNames = []
-	for i in range(1, len(records)):													#这个for只是将PAAC文件里的疏水性和亲水性特性督导AAProperty和AAPropertyNames
+	for i in range(1, len(records)):													
 		array = records[i].rstrip().split() if records[i].rstrip() != '' else None
 		AAProperty.append([float(j) for j in array[1:]])
 		AAPropertyNames.append(array[0])
-		#AAProperty里面装着都是PAAC文件序列特征后面的数据，AAPropertyNames里装的都是三个特征名字
+		
 	AAProperty1 = []
 	for i in AAProperty:
 		meanI = sum(i) / 20
 		fenmu = math.sqrt(sum([(j-meanI)**2 for j in i])/20)
 		AAProperty1.append([(j-meanI)/fenmu for j in i])
-	#AAProperty1里存了三个特征经过公式算出来以后的值，每一个Xj-meanI/fenmu的值（Xj是AAProperty里的值）
+	
 	encodings = []
 	header = ['#']
 	for aa in AA:
 		header.append('Xc1.' + aa)
-	for n in range(1, lambdaValue + 1):      #n是从1到6
+	for n in range(1, lambdaValue + 1):      
 		header.append('Xc2.lambda' + str(n))
 	encodings.append(header)
 
@@ -221,7 +221,7 @@ def PAAC(fastas, lambdaValue=6, w=0.5, **kw):
 		name, sequence = i[0], re.sub('-', '', i[1])
 		code = [name]
 		theta = []
-		for n in range(1, lambdaValue + 1): #lambdaValue=6，n是1到6  #seq:'LKAKTNISIREGPTLGNWAR'
+		for n in range(1, lambdaValue + 1): 
 			theta.append(
 				sum([Rvalue(sequence[j], sequence[j + n], AADict, AAProperty1) for j in range(len(sequence) - n)]) / (
 				len(sequence) - n))
@@ -240,7 +240,7 @@ kw = {'path': r"C:",'order': 'ACDEFGHIKLMNPQRSTVWY'}
 # fastas = readFasta(r"./dataset/main dataset/first/firstStage.faa")
 fastas = readFasta(r"./dataset/main dataset/second/secondStage.faa")
 aac = AAC(fastas, **kw)
-cksaap = CKSAAP(fastas, 5, **kw)  #FFMAVP数据集都是gap=5，但540因为序列长度短所以gap改成4
+cksaap = CKSAAP(fastas, 5, **kw)  
 paac = PAAC(fastas, 4, 0.05,  **kw)
 
 data_AAC = np.matrix(aac[1:])[:, 1:]
@@ -253,14 +253,14 @@ data_PAAC = np.matrix(paac[1:])[:, 1:]
 data_PAAC = pd.DataFrame(data=data_PAAC)
 
 seq_df = read_fasta('./dataset/main dataset/second/secondStage.faa')
-df = insert_phycs(seq_df)
-df = pd.DataFrame(df)
-df = np.array(df.values)
-df = df[:, 2:]
-feature = np.column_stack((data_AAC,data_CKSAAP,data_PAAC,df))#AAC是20维度，CSKAAP是2000维度(gap=4)，gap=5为2400，PAAC是24维度，phy9是9维度。#(data_AAC,data_CKSAAP,data_PAAC,df)
+phyc = insert_phycs(seq_df)
+phyc = pd.DataFrame(phyc)
+phyc = np.array(phyc.values)
+phyc = phyc[:, 2:]
+feature = np.column_stack((data_AAC,data_CKSAAP,data_PAAC,phyc))
 feature = pd.DataFrame(feature)
 print(feature)
-feature.to_csv("./test_second.csv", header=True, index=False)
+feature.to_csv("./AAC+CKSAAP+PAAC+PHYC_second.csv", header=True, index=False)
 
-#------------------要用AVPIden那个环境才能跑成功，不然会报错!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--------------------
+
 
